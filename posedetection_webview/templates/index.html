@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Yoga Pose Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+        }
+        #outputCanvas {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+        }
+        #feedback {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            z-index: 1000;
+            text-align: center;
+        }
+        #startButton {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            z-index: 1000;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="outputCanvas"></canvas>
+    <div id="feedback"></div>
+    <button id="startButton">Start Camera</button>
+
+    <script>
+        const canvas = document.getElementById('outputCanvas');
+        const ctx = canvas.getContext('2d');
+        const feedback = document.getElementById('feedback');
+        const startButton = document.getElementById('startButton');
+        let ws;
+
+        // Set canvas size
+        function updateCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Start video stream
+        async function startVideo() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.onloadedmetadata = () => {
+                    updateCanvasSize();
+                    startButton.style.display = 'none';
+                    connectWebSocket(video);
+                };
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                feedback.innerHTML = "Error accessing camera. Please check permissions.";
+            }
+        }
+
+        // Initialize WebSocket connection
+        function connectWebSocket(video) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket Connected');
+                startVideoProcessing(video);
+                feedback.innerHTML = "Connected! Processing pose...";
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.error) {
+                    console.error('Server error:', data.error);
+                    feedback.innerHTML = "Error processing pose";
+                    return;
+                }
+
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                };
+                img.src = data.image;
+
+                if (data.feedback.has_pose) {
+                    feedback.innerHTML = `
+                        ${data.feedback.feedback_text}<br>
+                        Error: ${data.feedback.overall_error.toFixed(4)}
+                    `;
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                feedback.innerHTML = "Connection error. Retrying...";
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket Closed');
+                feedback.innerHTML = "Connection lost. Reconnecting...";
+                setTimeout(() => connectWebSocket(video), 1000);
+            };
+        }
+
+        // Send video frames to server
+        function startVideoProcessing(video) {
+            const tempCanvas = document.createElement('canvas');
+
+            function sendFrame() {
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        tempCanvas.width = video.videoWidth;
+                        tempCanvas.height = video.videoHeight;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+                        const frameData = tempCanvas.toDataURL('image/jpeg', 0.5);  
+                        ws.send(frameData);
+                    }
+                    requestAnimationFrame(sendFrame);
+                }, 100);  
+            }
+
+            sendFrame();
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', updateCanvasSize);
+
+        // Start button click handler
+        startButton.addEventListener('click', startVideo);
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (ws) ws.close();
+            }
+        });
+    </script>
+</body>
+
+</html>
