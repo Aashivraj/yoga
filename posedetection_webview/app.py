@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize MediaPipe
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=False, model_complexity=1, enable_segmentation=False)
+pose = mp_pose.Pose(static_image_mode=False, model_complexity=0, enable_segmentation=False)
 
 # Load correct form data
 try:
