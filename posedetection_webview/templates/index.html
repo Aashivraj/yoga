@@ -44,12 +44,28 @@
             z-index: 1000;
             display: block;
         }
+        #staticVideo {
+            position: fixed;
+            top: 20px; /* Move the video to the top */
+            right: 20px; /* Align the video to the right */
+            width: 200px; /* Adjust the size of the video frame */
+            height: 150px;
+            object-fit: cover;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <canvas id="outputCanvas"></canvas>
     <div id="feedback"></div>
     <button id="startButton">Start Camera</button>
+    <!-- Static video element -->
+    <video id="staticVideo" autoplay loop muted>
+        <source src="/static/5_2.MOV" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 
     <script>
         const canvas = document.getElementById('outputCanvas');
@@ -70,8 +86,8 @@
                 const constraints = {
                     video: {
                         facingMode: 'environment',
-                        width: { ideal:  640},
-                        height: { ideal: 480  }
+                        width: { ideal:  640 },
+                        height: { ideal: 480 }
                     }
                 };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -173,5 +189,4 @@
         });
     </script>
 </body>
-
 </html>

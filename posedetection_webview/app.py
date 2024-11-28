@@ -13,7 +13,7 @@ import json
 import os
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__,  static_folder='static')
 CORS(app)
 
 # Configure logging
